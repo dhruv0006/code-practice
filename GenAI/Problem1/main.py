@@ -2,6 +2,7 @@ from datetime import datetime
 
 import sqlite3
 
+import anyio
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
@@ -52,31 +53,39 @@ class TextInputRequest(BaseModel):
     style: Optional[Literal['paragraph', 'bullet_points']] = 'paragraph'
 
 @app.post("/api/summarize", status_code=201)
-def summarize_text(request: TextInputRequest):
+async def summarize_text(request: TextInputRequest):
     creation_timestamp = datetime.now()
 
-    # Call the LLM to generate the summary
-    summary = summarizer.summarize(
-        request.input_text, request.max_words, request.style
+    # The LLM call waits on the network, so run it in a worker thread.
+    # 'await' lets the event loop serve other requests while we wait.
+    summary = await anyio.to_thread.run_sync(
+        summarizer.summarize,
+        request.input_text,
+        request.max_words,
+        request.style,
     )
 
-    cursor = db.cursor()
-    cursor.execute(
-        """
-        INSERT INTO text_summary
-            (input_text, max_words, style, llm_summary_text, creation_timestamp)
-        VALUES (?, ?, ?, ?, ?)
-        """,
-        (
-            request.input_text,
-            request.max_words,
-            request.style,
-            summary,
-            creation_timestamp,
-        ),
-    )
-    db.commit()
-    req_id = cursor.lastrowid
+    # sqlite3 calls are blocking too, so offload the insert the same way.
+    def save_summary():
+        cursor = db.cursor()
+        cursor.execute(
+            """
+            INSERT INTO text_summary
+                (input_text, max_words, style, llm_summary_text, creation_timestamp)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (
+                request.input_text,
+                request.max_words,
+                request.style,
+                summary,
+                creation_timestamp,
+            ),
+        )
+        db.commit()
+        return cursor.lastrowid
+
+    req_id = await anyio.to_thread.run_sync(save_summary)
 
     return {"req_id": req_id, "summary": summary}
 
