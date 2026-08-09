@@ -1,0 +1,20 @@
+# Environments
+.venv/
+venv/
+.env
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+
+# Vector stores / local data
+.chroma/
+*.faiss
+data/
+
+# Local databases
+*.db
+*.sqlite
+*.sqlite3

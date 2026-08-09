@@ -1,0 +1,17 @@
+# Core API
+fastapi>=0.115
+uvicorn[standard]>=0.30
+pydantic>=2.7
+python-dotenv>=1.0
+python-multipart>=0.0.9
+
+# AI providers (install what you use)
+openai>=1.40
+google-genai>=1.0
+
+# Helpers used in later problems
+numpy>=1.26
+cachetools>=5.3
+
+# Optional for RAG (Problem 5) — uncomment if you want a real vector store
+# chromadb>=0.5
